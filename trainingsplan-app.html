@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Trainingspläne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0A0D12;
+    --panel:#151B23;
+    --panel-2:#1B222C;
+    --border:rgba(255,255,255,0.09);
+    --text:#F3F6F8;
+    --text-dim:#8D9AA6;
+    --track:#33E6C9;
+    --track-soft:rgba(51,230,201,0.14);
+    --alert:#FF7A5C;
+    --alert-soft:rgba(255,122,92,0.14);
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--void); color:var(--text); font-family:var(--font-body);
+    overscroll-behavior:none;
+  }
+  button, input{ font-family:var(--font-body); color:var(--text); }
+  #app{ position:fixed; inset:0; display:flex; flex-direction:column; }
+
+  /* ---------- Topbar ---------- */
+  #topbar{
+    display:flex; align-items:center; gap:10px;
+    padding:calc(16px + env(safe-area-inset-top)) 20px 14px;
+    flex-shrink:0;
+  }
+  #back-btn{
+    display:none; width:34px; height:34px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--border);
+    align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  #back-btn.show{ display:flex; }
+  #back-btn svg{ width:16px; height:16px; }
+  #topbar h1{
+    font-family:var(--font-display); font-weight:700; font-size:22px; margin:0;
+    letter-spacing:-0.01em;
+  }
+
+  /* ---------- Screen ---------- */
+  #screen{ flex:1; overflow-y:auto; padding:4px 20px calc(24px + env(safe-area-inset-bottom)); }
+  #screen::-webkit-scrollbar{ display:none; }
+
+  /* ---------- Tabbar ---------- */
+  #tabbar{
+    display:flex; flex-shrink:0; border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom); background:var(--void);
+  }
+  #tabbar button{
+    flex:1; background:none; border:none; padding:13px 0 11px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    color:var(--text-dim); font-size:11.5px; font-weight:500; cursor:pointer;
+  }
+  #tabbar button svg{ width:21px; height:21px; opacity:.7; }
+  #tabbar button.active{ color:var(--track); }
+  #tabbar button.active svg{ opacity:1; }
+
+  /* ---------- Empty state ---------- */
+  .empty{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:60px 20px 20px; color:var(--text-dim);
+  }
+  .empty svg{ width:52px; height:52px; margin-bottom:16px; opacity:.55; }
+  .empty p{ font-size:14.5px; line-height:1.5; max-width:260px; margin:0 0 22px; }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    font-weight:600; font-size:15px; border:none; border-radius:100px;
+    padding:13px 24px; cursor:pointer; display:inline-flex; align-items:center;
+    justify-content:center; gap:8px;
+  }
+  .btn-primary{ background:var(--track); color:var(--void); }
+  .btn-ghost{ background:var(--panel); color:var(--text); border:1px solid var(--border); }
+  .btn-block{ width:100%; }
+  .btn:active{ transform:scale(0.97); }
+  .icon-btn{
+    width:38px; height:38px; border-radius:50%; background:var(--panel);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; flex-shrink:0;
+  }
+  .icon-btn svg{ width:16px; height:16px; }
+  .icon-btn.danger svg{ color:var(--alert); }
+
+  /* ---------- Plan cards ---------- */
+  .plan-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:18px;
+    padding:18px; margin-bottom:14px;
+  }
+  .plan-card-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:14px; }
+  .plan-card h3{ font-family:var(--font-display); font-size:18px; font-weight:700; margin:0 0 4px; }
+  .plan-card .meta{ font-size:13px; color:var(--text-dim); }
+  .plan-card-actions{ display:flex; gap:8px; align-items:center; }
+  .plan-card-foot{ display:flex; gap:8px; }
+
+  .fab{
+    position:fixed; right:20px; bottom:calc(88px + env(safe-area-inset-bottom));
+    width:56px; height:56px; border-radius:50%; background:var(--track);
+    color:var(--void); border:none; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 22px rgba(51,230,201,0.28); cursor:pointer; z-index:5;
+  }
+  .fab svg{ width:24px; height:24px; }
+
+  /* ---------- Forms (editor) ---------- */
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; font-weight:500; }
+  .field input{
+    width:100%; background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; padding:13px 14px; font-size:15.5px; outline:none;
+  }
+  .field input:focus{ border-color:var(--track); }
+
+  .ex-row{
+    background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:14px; margin-bottom:12px;
+  }
+  .ex-row-top{ display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .ex-row-top input{
+    flex:1; background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+    padding:11px 12px; font-size:15px; outline:none; font-weight:500;
+  }
+  .ex-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .ex-grid div{ display:flex; flex-direction:column; gap:5px; }
+  .ex-grid label{ font-size:10.5px; color:var(--text-dim); text-align:center; }
+  .ex-grid input{
+    background:var(--panel-2); border:1px solid var(--border); border-radius:9px;
+    padding:9px 4px; font-size:14px; text-align:center; outline:none; width:100%;
+  }
+
+  .add-ex-btn{
+    width:100%; background:none; border:1.5px dashed var(--border); border-radius:16px;
+    color:var(--text-dim); padding:16px; font-size:14.5px; font-weight:500; cursor:pointer;
+    margin-bottom:20px;
+  }
+
+  .form-actions{ display:flex; gap:10px; margin-top:6px; }
+  .form-actions .btn{ flex:1; }
+
+  /* ---------- History ---------- */
+  .stat-row{ display:flex; gap:12px; margin-bottom:18px; }
+  .stat-card{
+    flex:1; background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:16px; text-align:center;
+  }
+  .stat-card .n{ font-family:var(--font-display); font-weight:700; font-size:26px; color:var(--track); }
+  .stat-card .l{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+
+  .hist-item{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:15px 16px; margin-bottom:10px;
+  }
+  .hist-item .name{ font-weight:600; font-size:15px; margin-bottom:3px; }
+  .hist-item .date{ font-size:12.5px; color:var(--text-dim); }
+  .hist-item .dur{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--track); text-align:right; }
+  .hist-item .sets{ font-size:11.5px; color:var(--text-dim); text-align:right; }
+
+  /* ---------- Workout runner ---------- */
+  .wk-progress{ font-size:13px; color:var(--text-dim); margin-bottom:8px; font-weight:500; }
+  .wk-exname{ font-family:var(--font-display); font-weight:700; font-size:30px; line-height:1.15; margin:0 0 6px; }
+  .wk-target{ font-size:14.5px; color:var(--text-dim); margin-bottom:26px; }
+  .wk-target b{ color:var(--track); font-weight:600; }
+
+  .wk-inputs{ display:flex; gap:12px; margin-bottom:26px; }
+  .wk-input-box{ flex:1; background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; text-align:center; }
+  .wk-input-box label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:8px; }
+  .wk-input-box input{
+    width:100%; background:none; border:none; text-align:center;
+    font-family:var(--font-display); font-weight:700; font-size:28px; color:var(--text); outline:none;
+  }
+
+  .wk-dots{ display:flex; gap:6px; margin-bottom:30px; flex-wrap:wrap; }
+  .wk-dot{ width:9px; height:9px; border-radius:50%; background:var(--border); }
+  .wk-dot.done{ background:var(--track); }
+  .wk-dot.current{ background:var(--text); }
+
+  .rest-wrap{ display:flex; flex-direction:column; align-items:center; padding-top:30px; }
+  .rest-ring{ width:180px; height:180px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:26px; }
+  .rest-ring-inner{ width:154px; height:154px; border-radius:50%; background:var(--void); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .rest-ring-inner .t{ font-family:var(--font-display); font-weight:700; font-size:38px; }
+  .rest-ring-inner .l{ font-size:12.5px; color:var(--text-dim); margin-top:2px; }
+
+  .summary-wrap{ text-align:center; padding-top:50px; }
+  .summary-wrap svg{ width:56px; height:56px; color:var(--track); margin-bottom:18px; }
+  .summary-wrap h2{ font-family:var(--font-display); font-size:24px; margin:0 0 8px; }
+  .summary-wrap p{ color:var(--text-dim); font-size:14.5px; margin:0 0 30px; }
+  .summary-stats{ display:flex; gap:12px; margin-bottom:34px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <button id="back-btn" aria-label="Zurück">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <h1 id="topbar-title">Trainingspläne</h1>
+  </header>
+  <main id="screen"></main>
+  <nav id="tabbar">
+    <button data-tab="plans" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+      Pläne
+    </button>
+    <button data-tab="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+      Verlauf
+    </button>
+  </nav>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ---------- Persistence ----------
+const PLANS_KEY = 'tp_plans_v1';
+const HIST_KEY = 'tp_history_v1';
+const loadPlans = () => JSON.parse(localStorage.getItem(PLANS_KEY) || '[]');
+const savePlans = (p) => localStorage.setItem(PLANS_KEY, JSON.stringify(p));
+const loadHistory = () => JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+const saveHistory = (h) => localStorage.setItem(HIST_KEY, JSON.stringify(h));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+// ---------- State ----------
+let state = { view:'plans', editingPlan:null, workout:null };
+
+// ---------- DOM refs ----------
+const screen = document.getElementById('screen');
+const topbarTitle = document.getElementById('topbar-title');
+const backBtn = document.getElementById('back-btn');
+const tabbar = document.getElementById('tabbar');
+const tabButtons = tabbar.querySelectorAll('button');
+
+tabButtons.forEach(btn => btn.addEventListener('click', () => {
+  goTo(btn.dataset.tab);
+}));
+backBtn.addEventListener('click', () => {
+  if (state.view === 'workout' && state.workout && !state.workout.finished){
+    if (!confirm('Training abbrechen? Der Fortschritt geht verloren.')) return;
+    stopRestTimer();
+  }
+  goTo('plans');
+});
+
+function goTo(view, opts){
+  opts = opts || {};
+  state.view = view;
+  state.editingPlan = opts.plan || null;
+  if (view === 'workout' && opts.startPlanId) startWorkout(opts.startPlanId);
+  render();
+}
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' }) +
+    ' · ' + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+}
+function fmtDuration(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return m + ' Min' + (s ? ' ' + s + 's' : '');
+}
+
+// ---------- Render dispatcher ----------
+function render(){
+  tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === state.view));
+  const topLevel = state.view === 'plans' || state.view === 'history';
+  tabbar.style.display = topLevel ? 'flex' : 'none';
+  backBtn.classList.toggle('show', !topLevel);
+
+  if (state.view === 'plans'){ topbarTitle.textContent = 'Trainingspläne'; renderPlans(); }
+  else if (state.view === 'history'){ topbarTitle.textContent = 'Verlauf'; renderHistory(); }
+  else if (state.view === 'editor'){ topbarTitle.textContent = state.editingPlan.name ? 'Plan bearbeiten' : 'Neuer Plan'; renderEditor(); }
+  else if (state.view === 'workout'){ topbarTitle.textContent = state.workout ? state.workout.planName : 'Training'; renderWorkout(); }
+}
+
+// ============ PLANS VIEW ============
+function renderPlans(){
+  const plans = loadPlans();
+  if (!plans.length){
+    screen.innerHTML = `
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 6.5 17.5 17.5M4 9l3-3 3 3M20 15l-3 3-3-3M9 4l-2 2M15 20l2-2M2 12h2M20 12h2"/></svg>
+        <p>Du hast noch keinen Trainingsplan. Leg deinen ersten Plan mit Übungen, Sätzen und Wiederholungen an.</p>
+        <button class="btn btn-primary" id="empty-create">+ Ersten Plan erstellen</button>
+      </div>`;
+    document.getElementById('empty-create').addEventListener('click', () => openEditor(null));
+    return;
+  }
+
+  screen.innerHTML = plans.map(p => `
+    <div class="plan-card" data-id="${p.id}">
+      <div class="plan-card-head">
+        <div>
+          <h3>${escapeHtml(p.name)}</h3>
+          <div class="meta">${p.exercises.length} Übung${p.exercises.length===1?'':'en'}</div>
+        </div>
+        <div class="plan-card-actions">
+          <button class="icon-btn edit-btn" aria-label="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+          <button class="icon-btn danger del-btn" aria-label="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="plan-card-foot">
+        <button class="btn btn-primary btn-block start-btn">Training starten</button>
+      </div>
+    </div>
+  `).join('');
+
+  screen.querySelectorAll('.plan-card').forEach(card => {
+    const id = card.dataset.id;
+    card.querySelector('.start-btn').addEventListener('click', () => goTo('workout', { startPlanId:id }));
+    card.querySelector('.edit-btn').addEventListener('click', () => {
+      const plan = loadPlans().find(p => p.id === id);
+      openEditor(plan);
+    });
+    card.querySelector('.del-btn').addEventListener('click', () => {
+      if (!confirm('Diesen Plan wirklich löschen?')) return;
+      savePlans(loadPlans().filter(p => p.id !== id));
+      renderPlans();
+    });
+  });
+
+  if (!document.getElementById('plans-fab')){
+    const fab = document.createElement('button');
+    fab.className = 'fab'; fab.id = 'plans-fab';
+    fab.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+    fab.addEventListener('click', () => openEditor(null));
+    document.getElementById('app').appendChild(fab);
+  }
+}
+
+function openEditor(plan){
+  const fab = document.getElementById('plans-fab');
+  if (fab) fab.remove();
+  const working = plan
+    ? JSON.parse(JSON.stringify(plan))
+    : { id:uid(), name:'', exercises:[{ id:uid(), name:'', sets:3, reps:10, weight:null, restSec:90 }] };
+  goTo('editor', { plan:working });
+}
+
+// ============ EDITOR VIEW ============
+function renderEditor(){
+  const fab = document.getElementById('plans-fab');
+  if (fab) fab.remove();
+  const p = state.editingPlan;
+
+  screen.innerHTML = `
+    <div class="field">
+      <label>Plan-Name</label>
+      <input id="plan-name" type="text" placeholder="z. B. Push Day" value="${escapeHtml(p.name)}">
+    </div>
+    <div id="ex-list"></div>
+    <button class="add-ex-btn" id="add-ex">+ Übung hinzufügen</button>
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="cancel-edit">Abbrechen</button>
+      <button class="btn btn-primary" id="save-plan">Plan speichern</button>
+    </div>
+  `;
+
+  const exList = document.getElementById('ex-list');
+  function drawExercises(){
+    exList.innerHTML = p.exercises.map((ex, i) => `
+      <div class="ex-row" data-i="${i}">
+        <div class="ex-row-top">
+          <input type="text" class="ex-name" placeholder="Übung, z. B. Bankdrücken" value="${escapeHtml(ex.name)}">
+          <button class="icon-btn danger ex-del" aria-label="Übung entfernen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="ex-grid">
+          <div><label>Sätze</label><input type="number" min="1" class="ex-sets" value="${ex.sets}"></div>
+          <div><label>Wdh.</label><input type="number" min="1" class="ex-reps" value="${ex.reps}"></div>
+          <div><label>kg (optional)</label><input type="number" min="0" step="0.5" class="ex-weight" value="${ex.weight ?? ''}"></div>
+          <div><label>Pause (s)</label><input type="number" min="0" step="5" class="ex-rest" value="${ex.restSec}"></div>
+        </div>
+      </div>
+    `).join('');
+
+    exList.querySelectorAll('.ex-row').forEach(row => {
+      const i = Number(row.dataset.i);
+      row.querySelector('.ex-name').addEventListener('input', e => p.exercises[i].name = e.target.value);
+      row.querySelector('.ex-sets').addEventListener('input', e => p.exercises[i].sets = Math.max(1, Number(e.target.value)||1));
+      row.querySelector('.ex-reps').addEventListener('input', e => p.exercises[i].reps = Math.max(1, Number(e.target.value)||1));
+      row.querySelector('.ex-weight').addEventListener('input', e => p.exercises[i].weight = e.target.value === '' ? null : Number(e.target.value));
+      row.querySelector('.ex-rest').addEventListener('input', e => p.exercises[i].restSec = Math.max(0, Number(e.target.value)||0));
+      row.querySelector('.ex-del').addEventListener('click', () => {
+        p.exercises.splice(i,1);
+        drawExercises();
+      });
+    });
+  }
+  drawExercises();
+
+  document.getElementById('add-ex').addEventListener('click', () => {
+    p.exercises.push({ id:uid(), name:'', sets:3, reps:10, weight:null, restSec:90 });
+    drawExercises();
+  });
+  document.getElementById('plan-name').addEventListener('input', e => p.name = e.target.value);
+  document.getElementById('cancel-edit').addEventListener('click', () => goTo('plans'));
+  document.getElementById('save-plan').addEventListener('click', () => {
+    const cleanExercises = p.exercises.filter(ex => ex.name.trim() !== '');
+    if (!p.name.trim() || !cleanExercises.length){
+      alert('Bitte gib einen Plan-Namen und mindestens eine Übung mit Namen an.');
+      return;
+    }
+    p.exercises = cleanExercises;
+    const plans = loadPlans();
+    const idx = plans.findIndex(pl => pl.id === p.id);
+    if (idx >= 0) plans[idx] = p; else plans.push(p);
+    savePlans(plans);
+    goTo('plans');
+  });
+}
+
+// ============ WORKOUT VIEW ============
+let restInterval = null;
+function stopRestTimer(){ if (restInterval){ clearInterval(restInterval); restInterval = null; } }
+
+function startWorkout(planId){
+  const plan = loadPlans().find(p => p.id === planId);
+  if (!plan) return;
+  state.workout = {
+    planId: plan.id,
+    planName: plan.name,
+    exercises: plan.exercises.map(e => ({ ...e, log: [] })),
+    exIndex: 0,
+    setIndex: 0,
+    startedAt: Date.now(),
+    resting: false,
+    restRemaining: 0,
+    finished: false
+  };
+}
+
+function currentExercise(){ return state.workout.exercises[state.workout.exIndex]; }
+
+function renderWorkout(){
+  const w = state.workout;
+  if (!w) { goTo('plans'); return; }
+
+  if (w.finished){ renderWorkoutSummary(); return; }
+  if (w.resting){ renderRestScreen(); return; }
+
+  const ex = currentExercise();
+  const totalEx = w.exercises.length;
+  const dots = Array.from({length: ex.sets}).map((_,i) => {
+    const cls = i < w.setIndex ? 'done' : (i === w.setIndex ? 'current' : '');
+    return `<div class="wk-dot ${cls}"></div>`;
+  }).join('');
+
+  screen.innerHTML = `
+    <div class="wk-progress">Übung ${w.exIndex+1}/${totalEx} · Satz ${w.setIndex+1}/${ex.sets}</div>
+    <h2 class="wk-exname">${escapeHtml(ex.name)}</h2>
+    <div class="wk-target">Ziel: <b>${ex.reps} Wiederholungen</b>${ex.weight ? ` · <b>${ex.weight} kg</b>` : ''}</div>
+    <div class="wk-dots">${dots}</div>
+    <div class="wk-inputs">
+      <div class="wk-input-box">
+        <label>Wiederholungen</label>
+        <input type="number" id="log-reps" value="${ex.reps}" min="0">
+      </div>
+      <div class="wk-input-box">
+        <label>Gewicht (kg)</label>
+        <input type="number" id="log-weight" value="${ex.weight ?? 0}" min="0" step="0.5">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="complete-set">Satz abschließen</button>
+  `;
+
+  document.getElementById('complete-set').addEventListener('click', () => {
+    const reps = Number(document.getElementById('log-reps').value) || 0;
+    const weight = Number(document.getElementById('log-weight').value) || 0;
+    ex.log.push({ reps, weight });
+    advanceAfterSet();
+  });
+}
+
+function advanceAfterSet(){
+  const w = state.workout;
+  const ex = currentExercise();
+  const isLastSetOfExercise = w.setIndex >= ex.sets - 1;
+  const isLastExercise = w.exIndex >= w.exercises.length - 1;
+
+  if (isLastSetOfExercise && isLastExercise){
+    w.finished = true;
+    render();
+    return;
+  }
+
+  if (ex.restSec > 0){
+    w.resting = true;
+    w.restRemaining = ex.restSec;
+    render();
+    stopRestTimer();
+    restInterval = setInterval(() => {
+      w.restRemaining--;
+      if (w.restRemaining <= 0){
+        finishRest();
+      } else if (state.view === 'workout' && w.resting){
+        updateRestRing();
+      }
+    }, 1000);
+  } else {
+    stepToNext();
+    render();
+  }
+}
+
+function stepToNext(){
+  const w = state.workout;
+  const ex = currentExercise();
+  if (w.setIndex >= ex.sets - 1){
+    w.exIndex++;
+    w.setIndex = 0;
+  } else {
+    w.setIndex++;
+  }
+}
+
+function finishRest(){
+  stopRestTimer();
+  const w = state.workout;
+  w.resting = false;
+  stepToNext();
+  render();
+}
+
+function renderRestScreen(){
+  const w = state.workout;
+  const ex = currentExercise();
+  screen.innerHTML = `
+    <div class="rest-wrap">
+      <div class="rest-ring" id="rest-ring">
+        <div class="rest-ring-inner">
+          <div class="t" id="rest-time">${formatRest(w.restRemaining)}</div>
+          <div class="l">Pause</div>
+        </div>
+      </div>
+      <div class="wk-target" style="margin-bottom:26px;">Nächster Satz: <b>${escapeHtml(ex.name)}</b></div>
+      <button class="btn btn-ghost" id="skip-rest">Überspringen</button>
+    </div>
+  `;
+  updateRestRing();
+  document.getElementById('skip-rest').addEventListener('click', finishRest);
+}
+
+function formatRest(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function updateRestRing(){
+  const w = state.workout;
+  const ex = currentExercise();
+  const ring = document.getElementById('rest-ring');
+  const timeEl = document.getElementById('rest-time');
+  if (!ring || !timeEl) return;
+  const total = ex.restSec || 1;
+  const pct = Math.max(0, Math.min(100, ((total - w.restRemaining) / total) * 100));
+  ring.style.background = `conic-gradient(var(--track) ${pct}%, rgba(255,255,255,0.1) 0%)`;
+  timeEl.textContent = formatRest(w.restRemaining);
+}
+
+function renderWorkoutSummary(){
+  const w = state.workout;
+  const durationSec = Math.round((Date.now() - w.startedAt) / 1000);
+  const totalSets = w.exercises.reduce((s,e) => s + e.log.length, 0);
+
+  screen.innerHTML = `
+    <div class="summary-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <h2>Training abgeschlossen</h2>
+      <p>Stark gemacht, ${escapeHtml(w.planName)} ist im Kasten.</p>
+      <div class="summary-stats">
+        <div class="stat-card"><div class="n">${totalSets}</div><div class="l">Sätze</div></div>
+        <div class="stat-card"><div class="n">${fmtDuration(durationSec)}</div><div class="l">Dauer</div></div>
+      </div>
+      <button class="btn btn-primary btn-block" id="finish-save">Fertig</button>
+    </div>
+  `;
+
+  document.getElementById('finish-save').addEventListener('click', () => {
+    const history = loadHistory();
+    history.unshift({
+      id: uid(),
+      planId: w.planId,
+      planName: w.planName,
+      date: new Date().toISOString(),
+      durationSec,
+      totalSets
+    });
+    saveHistory(history);
+    state.workout = null;
+    goTo('plans');
+  });
+}
+
+// ============ HISTORY VIEW ============
+function renderHistory(){
+  const history = loadHistory();
+  const weekAgo = Date.now() - 7*24*60*60*1000;
+  const thisWeek = history.filter(h => new Date(h.date).getTime() >= weekAgo).length;
+
+  if (!history.length){
+    screen.innerHTML = `
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>
+        <p>Noch keine abgeschlossenen Trainings. Starte einen Plan, dein Verlauf erscheint danach hier.</p>
+      </div>`;
+    return;
+  }
+
+  screen.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="n">${history.length}</div><div class="l">Trainings gesamt</div></div>
+      <div class="stat-card"><div class="n">${thisWeek}</div><div class="l">Diese Woche</div></div>
+    </div>
+    ${history.map(h => `
+      <div class="hist-item">
+        <div>
+          <div class="name">${escapeHtml(h.planName)}</div>
+          <div class="date">${fmtDate(h.date)}</div>
+        </div>
+        <div>
+          <div class="dur">${fmtDuration(h.durationSec)}</div>
+          <div class="sets">${h.totalSets} Sätze</div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ---------- Utils ----------
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+render();
+})();
+</script>
+</body>
+</html>

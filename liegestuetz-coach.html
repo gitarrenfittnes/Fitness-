@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Liegestütz-Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0A0D12;
+    --void-2:#0F141B;
+    --panel:rgba(15,20,27,0.7);
+    --panel-border:rgba(255,255,255,0.09);
+    --text:#F3F6F8;
+    --text-dim:#8D9AA6;
+    --track:#33E6C9;
+    --track-soft:rgba(51,230,201,0.18);
+    --alert:#FF7A5C;
+    --alert-soft:rgba(255,122,92,0.18);
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--void); color:var(--text);
+    font-family:var(--font-body);
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+  #app{
+    position:fixed; inset:0;
+  }
+
+  /* ---------- Start / Idle Screen ---------- */
+  #start-screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:32px 28px calc(40px + env(safe-area-inset-bottom));
+    background:
+      radial-gradient(circle at 50% 18%, rgba(51,230,201,0.10), transparent 55%),
+      var(--void);
+    text-align:center;
+    z-index:20;
+    transition:opacity .35s ease, visibility .35s ease;
+  }
+  #start-screen.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+
+  .hero-figure{ width:132px; height:auto; margin-bottom:22px; opacity:.95; }
+  .hero-figure path, .hero-figure circle{
+    fill:none; stroke:var(--track); stroke-width:3.4; stroke-linecap:round; stroke-linejoin:round;
+  }
+  .hero-figure circle{ fill:var(--track); stroke:none; }
+
+  h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:28px;
+    line-height:1.15;
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    font-size:15px;
+    line-height:1.55;
+    color:var(--text-dim);
+    max-width:320px;
+    margin:0 0 30px;
+  }
+  .sub b{ color:var(--text); font-weight:600; }
+
+  .btn-primary{
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:16px;
+    color:var(--void);
+    background:var(--track);
+    border:none;
+    border-radius:100px;
+    padding:16px 34px;
+    cursor:pointer;
+    display:inline-flex; align-items:center; gap:10px;
+    transition:transform .15s ease, opacity .15s ease;
+  }
+  .btn-primary:active{ transform:scale(0.96); }
+
+  .cam-toggle-row{
+    margin-top:18px;
+    display:flex; gap:8px; align-items:center;
+    font-size:13px; color:var(--text-dim);
+  }
+  .cam-toggle-row button{
+    background:none; border:1px solid var(--panel-border);
+    color:var(--text-dim); font-family:var(--font-body); font-size:13px;
+    padding:8px 14px; border-radius:100px; cursor:pointer;
+  }
+  .cam-toggle-row button.active{ color:var(--track); border-color:var(--track); }
+
+  .error-box{
+    margin-top:22px; font-size:13px; color:var(--alert);
+    max-width:300px; display:none; line-height:1.5;
+  }
+  .error-box.show{ display:block; }
+
+  /* ---------- Camera layer ---------- */
+  #video, #overlay{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+  }
+  #video{ background:#000; }
+  #video.mirror, #overlay.mirror{ transform:scaleX(-1); }
+  #overlay{ z-index:5; }
+
+  #session{ position:absolute; inset:0; z-index:10; visibility:hidden; opacity:0; transition:opacity .3s ease; }
+  #session.active{ visibility:visible; opacity:1; }
+
+  .scrim-top{
+    position:absolute; top:0; left:0; right:0; height:190px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+    pointer-events:none; z-index:6;
+  }
+  .scrim-bottom{
+    position:absolute; bottom:0; left:0; right:0; height:230px;
+    background:linear-gradient(0deg, rgba(0,0,0,0.6), transparent);
+    pointer-events:none; z-index:6;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud-top{
+    position:absolute; top:calc(18px + env(safe-area-inset-top)); left:20px; right:20px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    z-index:15;
+  }
+  .metric{ display:flex; flex-direction:column; }
+  .metric.right{ align-items:flex-end; }
+  .metric-value{
+    font-family:var(--font-display); font-weight:700; font-size:52px; line-height:1;
+    letter-spacing:-0.02em;
+    text-shadow:0 2px 18px rgba(0,0,0,0.45);
+  }
+  .metric-label{
+    font-size:12px; color:var(--text-dim); margin-top:5px; font-weight:500;
+  }
+
+  .score-ring{
+    width:64px; height:64px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:conic-gradient(var(--track) 0%, rgba(255,255,255,0.12) 0%);
+    transition:background 0.4s ease;
+  }
+  .score-ring-inner{
+    width:52px; height:52px; border-radius:50%;
+    background:rgba(10,13,18,0.82);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .score-ring-inner .n{ font-family:var(--font-display); font-weight:700; font-size:17px; }
+  .score-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+
+  /* ---------- Feedback banner ---------- */
+  .feedback-wrap{
+    position:absolute; left:0; right:0; bottom:calc(118px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center; z-index:15; pointer-events:none;
+  }
+  .feedback-pill{
+    font-family:var(--font-body); font-weight:600; font-size:15px;
+    padding:12px 22px; border-radius:100px;
+    background:var(--alert-soft); color:var(--alert);
+    border:1px solid rgba(255,122,92,0.35);
+    opacity:0; transform:translateY(8px);
+    transition:opacity .25s ease, transform .25s ease, background .25s ease, color .25s ease, border-color .25s ease;
+    max-width:82vw; text-align:center;
+  }
+  .feedback-pill.show{ opacity:1; transform:translateY(0); }
+  .feedback-pill.good{
+    background:var(--track-soft); color:var(--track); border-color:rgba(51,230,201,0.4);
+  }
+
+  /* ---------- Bottom controls ---------- */
+  .controls{
+    position:absolute; left:0; right:0; bottom:calc(28px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center; align-items:center; gap:16px;
+    z-index:15;
+  }
+  .ctrl-btn{
+    font-family:var(--font-body); font-weight:600; font-size:14px;
+    border-radius:100px; border:1px solid var(--panel-border);
+    background:var(--panel); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    color:var(--text); padding:14px 22px; cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+  }
+  .ctrl-btn.stop{ background:rgba(255,122,92,0.14); border-color:rgba(255,122,92,0.4); color:var(--alert); }
+  .ctrl-btn.icon-only{ padding:14px; width:48px; height:48px; justify-content:center; }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--alert); }
+
+  .hint-line{
+    position:absolute; top:calc(96px + env(safe-area-inset-top)); left:0; right:0;
+    text-align:center; z-index:15; pointer-events:none;
+  }
+  .hint-line span{
+    font-size:12.5px; color:var(--text-dim); background:rgba(10,13,18,0.55);
+    padding:6px 12px; border-radius:100px;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <svg class="hero-figure" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 62 L48 30 L88 30 L142 62"/>
+      <path d="M48 30 L48 46"/>
+      <path d="M18 62 L10 70"/>
+      <circle cx="96" cy="24" r="7"/>
+      <path d="M96 31 L88 30"/>
+    </svg>
+    <h1>Bereit für deine Liegestütze?</h1>
+    <p class="sub">Stell dein Handy seitlich auf, etwa <b>1&nbsp;Meter</b> entfernt, sodass dein ganzer Körper im Bild ist. Kein Login, keine Kosten &mdash; alles läuft direkt in deinem Browser.</p>
+    <button class="btn-primary" id="start-btn">Kamera starten</button>
+    <div class="cam-toggle-row">
+      <span>Kamera:</span>
+      <button id="cam-back" class="active" data-mode="environment">Rück&shy;kamera</button>
+      <button id="cam-front" data-mode="user">Front&shy;kamera</button>
+    </div>
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- Camera + HUD -->
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+
+  <div id="session">
+    <div class="scrim-top"></div>
+    <div class="scrim-bottom"></div>
+
+    <div class="hint-line" id="hint-line"><span>Suche Körper&nbsp;&hellip;</span></div>
+
+    <div class="hud-top">
+      <div class="metric">
+        <div class="metric-value" id="rep-value">0</div>
+        <div class="metric-label">Reps</div>
+      </div>
+      <div class="score-wrap">
+        <div class="score-ring" id="score-ring">
+          <div class="score-ring-inner"><span class="n" id="score-value">&ndash;</span></div>
+        </div>
+        <div class="metric-label">Technik</div>
+      </div>
+    </div>
+
+    <div class="feedback-wrap">
+      <div class="feedback-pill" id="feedback-pill">Rücken gerade halten</div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="reset-btn">Zurücksetzen</button>
+      <button class="ctrl-btn stop" id="stop-btn"><span class="dot"></span>Beenden</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- DOM refs ----------
+  const startScreen = document.getElementById('start-screen');
+  const startBtn = document.getElementById('start-btn');
+  const stopBtn = document.getElementById('stop-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const errorBox = document.getElementById('error-box');
+  const videoEl = document.getElementById('video');
+  const canvasEl = document.getElementById('overlay');
+  const ctx = canvasEl.getContext('2d');
+  const session = document.getElementById('session');
+  const repValue = document.getElementById('rep-value');
+  const scoreValue = document.getElementById('score-value');
+  const scoreRing = document.getElementById('score-ring');
+  const feedbackPill = document.getElementById('feedback-pill');
+  const hintLine = document.getElementById('hint-line');
+  const camBackBtn = document.getElementById('cam-back');
+  const camFrontBtn = document.getElementById('cam-front');
+
+  let facingMode = 'environment';
+  camBackBtn.addEventListener('click', () => setFacing('environment'));
+  camFrontBtn.addEventListener('click', () => setFacing('user'));
+  function setFacing(mode){
+    facingMode = mode;
+    camBackBtn.classList.toggle('active', mode === 'environment');
+    camFrontBtn.classList.toggle('active', mode === 'user');
+  }
+
+  // ---------- State ----------
+  let stream = null;
+  let running = false;
+  let processing = false;
+  let pose = null;
+
+  let stage = 'up';               // 'up' | 'down'
+  let repCount = 0;
+  let bottomAngle = 180;
+  let minBackAngleDuringRep = 180;
+  let repScores = [];
+  let bodyVisible = false;
+
+  let feedbackTimeout = null;
+  let liveWarningActive = false;
+
+  const UP_THRESH = 158;
+  const DOWN_THRESH = 95;
+  const BACK_WARN = 155;
+
+  // Landmark indices
+  const L = { shoulder:11, elbow:13, wrist:15, hip:23, knee:25, ankle:27 };
+  const R = { shoulder:12, elbow:14, wrist:16, hip:24, knee:26, ankle:28 };
+
+  // ---------- Geometry ----------
+  function angleAt(a, b, c){
+    const ab = { x:a.x-b.x, y:a.y-b.y };
+    const cb = { x:c.x-b.x, y:c.y-b.y };
+    const magAB = Math.hypot(ab.x, ab.y);
+    const magCB = Math.hypot(cb.x, cb.y);
+    if (magAB === 0 || magCB === 0) return 180;
+    const cos = (ab.x*cb.x + ab.y*cb.y) / (magAB*magCB);
+    return Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI;
+  }
+  const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
+  const mapRange = (v,a,b,c,d) => clamp(c + (v-a) * (d-c) / (b-a), Math.min(c,d), Math.max(c,d));
+
+  // ---------- Feedback ----------
+  function setFeedback(text, tone, persist){
+    feedbackPill.textContent = text;
+    feedbackPill.classList.toggle('good', tone === 'good');
+    feedbackPill.classList.add('show');
+    if (feedbackTimeout) clearTimeout(feedbackTimeout);
+    if (!persist){
+      feedbackTimeout = setTimeout(() => {
+        if (!liveWarningActive) feedbackPill.classList.remove('show');
+      }, 2400);
+    }
+  }
+  function clearFeedback(){
+    feedbackPill.classList.remove('show');
+  }
+
+  // ---------- Scoring ----------
+  function updateScoreUI(){
+    const overall = repScores.length
+      ? Math.round(repScores.reduce((a,b)=>a+b,0) / repScores.length)
+      : null;
+    scoreValue.textContent = overall === null ? '–' : overall;
+    const pct = overall === null ? 0 : overall;
+    let ringColor = 'var(--track)';
+    if (overall !== null && overall < 60) ringColor = 'var(--alert)';
+    scoreRing.style.background =
+      `conic-gradient(${ringColor} ${pct}%, rgba(255,255,255,0.12) 0%)`;
+  }
+
+  function evaluateRep(bottom, top, minBack){
+    const depthScore = mapRange(bottom, 70, 115, 100, 35);
+    const extScore = mapRange(top, 150, 178, 35, 100);
+    const backScore = mapRange(minBack, 138, 178, 25, 100);
+    const repScore = Math.round((depthScore + extScore + backScore) / 3);
+
+    repScores.push(repScore);
+    if (repScores.length > 20) repScores.shift();
+    updateScoreUI();
+
+    if (backScore < 65){
+      setFeedback('Rücken gerade halten', 'warn', false);
+    } else if (depthScore < 65){
+      setFeedback('Tiefer gehen', 'warn', false);
+    } else if (extScore < 65){
+      setFeedback('Arme vollständig strecken', 'warn', false);
+    } else {
+      setFeedback('Starke Wiederholung', 'good', false);
+    }
+  }
+
+  // ---------- Drawing ----------
+  function resizeCanvasToVideo(){
+    const w = videoEl.videoWidth, h = videoEl.videoHeight;
+    if (w && h && (canvasEl.width !== w || canvasEl.height !== h)){
+      canvasEl.width = w;
+      canvasEl.height = h;
+    }
+  }
+
+  function pickSide(lm){
+    const visSum = idx => idx.reduce((s,i) => s + (lm[i]?.visibility || 0), 0);
+    const leftVis = visSum([L.shoulder, L.elbow, L.wrist, L.hip, L.ankle]);
+    const rightVis = visSum([R.shoulder, R.elbow, R.wrist, R.hip, R.ankle]);
+    return leftVis >= rightVis ? L : R;
+  }
+
+  function drawSkeleton(lm, side, formGood){
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    const w = canvasEl.width, h = canvasEl.height;
+    const color = formGood ? '#33E6C9' : '#FF7A5C';
+    const pairs = [
+      [side.shoulder, side.elbow], [side.elbow, side.wrist],
+      [side.shoulder, side.hip], [side.hip, side.knee], [side.knee, side.ankle],
+      [L.shoulder, R.shoulder], [L.hip, R.hip]
+    ];
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    pairs.forEach(([a,b]) => {
+      const pa = lm[a], pb = lm[b];
+      if (!pa || !pb) return;
+      if ((pa.visibility||0) < 0.4 || (pb.visibility||0) < 0.4) return;
+      ctx.beginPath();
+      ctx.moveTo(pa.x*w, pa.y*h);
+      ctx.lineTo(pb.x*w, pb.y*h);
+      ctx.stroke();
+    });
+    ctx.fillStyle = color;
+    [side.shoulder, side.elbow, side.wrist, side.hip, side.knee, side.ankle].forEach(i => {
+      const p = lm[i];
+      if (!p || (p.visibility||0) < 0.4) return;
+      ctx.beginPath();
+      ctx.arc(p.x*w, p.y*h, 5.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  // ---------- Main pose callback ----------
+  function onResults(results){
+    resizeCanvasToVideo();
+    const lm = results.poseLandmarks;
+
+    if (!lm){
+      bodyVisible = false;
+      hintLine.style.display = 'flex';
+      ctx.clearRect(0,0,canvasEl.width, canvasEl.height);
+      return;
+    }
+
+    const side = pickSide(lm);
+    const keyPoints = [side.shoulder, side.elbow, side.wrist, side.hip, side.ankle];
+    const visibleEnough = keyPoints.every(i => (lm[i]?.visibility || 0) > 0.45);
+
+    if (!visibleEnough){
+      bodyVisible = false;
+      hintLine.style.display = 'flex';
+      ctx.clearRect(0,0,canvasEl.width, canvasEl.height);
+      return;
+    }
+    bodyVisible = true;
+    hintLine.style.display = 'none';
+
+    const shoulder = lm[side.shoulder], elbow = lm[side.elbow], wrist = lm[side.wrist];
+    const hip = lm[side.hip], ankle = lm[side.ankle];
+
+    const elbowAngle = angleAt(shoulder, elbow, wrist);
+    const backAngle = angleAt(shoulder, hip, ankle);
+
+    const backOK = backAngle >= BACK_WARN;
+    drawSkeleton(lm, side, backOK);
+
+    // live back warning during descent/hold
+    if (stage === 'down' || elbowAngle < UP_THRESH){
+      if (!backOK){
+        liveWarningActive = true;
+        setFeedback('Rücken gerade halten', 'warn', true);
+      } else if (liveWarningActive){
+        liveWarningActive = false;
+        clearFeedback();
+      }
+    } else if (liveWarningActive){
+      liveWarningActive = false;
+      clearFeedback();
+    }
+
+    // rep state machine
+    if (stage === 'up'){
+      if (elbowAngle < DOWN_THRESH){
+        stage = 'down';
+        bottomAngle = elbowAngle;
+        minBackAngleDuringRep = backAngle;
+      }
+    } else {
+      bottomAngle = Math.min(bottomAngle, elbowAngle);
+      minBackAngleDuringRep = Math.min(minBackAngleDuringRep, backAngle);
+      if (elbowAngle > UP_THRESH){
+        stage = 'up';
+        repCount++;
+        repValue.textContent = repCount;
+        evaluateRep(bottomAngle, elbowAngle, minBackAngleDuringRep);
+        bottomAngle = 180;
+      }
+    }
+  }
+
+  // ---------- Camera lifecycle ----------
+  async function startCamera(){
+    errorBox.classList.remove('show');
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode }, width:{ ideal:960 }, height:{ ideal:1280 } },
+        audio: false
+      });
+    } catch(err){
+      errorBox.textContent = 'Kamera-Zugriff nicht möglich. Bitte erlaube den Zugriff in den Browser-Einstellungen und lade die Seite neu.';
+      errorBox.classList.add('show');
+      return false;
+    }
+    videoEl.srcObject = stream;
+    await videoEl.play();
+
+    const mirrored = facingMode === 'user';
+    videoEl.classList.toggle('mirror', mirrored);
+    canvasEl.classList.toggle('mirror', mirrored);
+
+    if (!pose){
+      pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+      });
+      pose.onResults(onResults);
+    }
+
+    running = true;
+    requestAnimationFrame(frameLoop);
+    return true;
+  }
+
+  async function frameLoop(){
+    if (!running) return;
+    if (!processing && videoEl.readyState >= 2){
+      processing = true;
+      try { await pose.send({ image: videoEl }); }
+      catch(e){ /* ignore transient frame errors */ }
+      processing = false;
+    }
+    requestAnimationFrame(frameLoop);
+  }
+
+  function stopCamera(){
+    running = false;
+    if (stream){
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    videoEl.srcObject = null;
+    ctx.clearRect(0,0,canvasEl.width, canvasEl.height);
+  }
+
+  function resetStats(){
+    repCount = 0;
+    repScores = [];
+    stage = 'up';
+    bottomAngle = 180;
+    repValue.textContent = '0';
+    updateScoreUI();
+    clearFeedback();
+  }
+
+  // ---------- Events ----------
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    startBtn.textContent = 'Starte Kamera …';
+    const ok = await startCamera();
+    startBtn.disabled = false;
+    startBtn.textContent = 'Kamera starten';
+    if (ok){
+      resetStats();
+      startScreen.classList.add('hidden');
+      session.classList.add('active');
+      hintLine.style.display = 'flex';
+    }
+  });
+
+  stopBtn.addEventListener('click', () => {
+    stopCamera();
+    session.classList.remove('active');
+    startScreen.classList.remove('hidden');
+  });
+
+  resetBtn.addEventListener('click', resetStats);
+
+  window.addEventListener('beforeunload', stopCamera);
+})();
+</script>
+</body>
+</html>
